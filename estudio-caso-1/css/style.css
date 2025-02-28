@@ -19,3 +19,28 @@ body {
 #task-list .list-group-item .task-title {
     font-weight: bold;
 }
+
+.comments-section {
+    margin-top: 1rem;
+    border-top: 1px solid #ccc;
+    padding-top: 0.5rem;
+}
+
+.comments-list {
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.comment-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.comment-item button {
+    background: none;
+    border: none;
+    color: red;
+    cursor: pointer;
+    font-weight: bold;
+}
