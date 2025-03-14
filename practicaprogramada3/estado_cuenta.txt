@@ -1,0 +1,9 @@
+=== ESTADO DE CUENTA ===
+Compra en Supermercado: $100.00
+Pago Spotify: $7.00
+Suscripción boletin: $20.00
+
+Monto Total de Contado: $127.00
+Monto con Interés (2.6%): $130.30
+Cash Back (0.1%): -$0.13
+Monto Final a Pagar: $130.18
