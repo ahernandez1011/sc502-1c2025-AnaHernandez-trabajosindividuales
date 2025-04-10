@@ -215,3 +215,59 @@ document.addEventListener('DOMContentLoaded', function () {
     })
     loadTasks();
 });
+
+function renderTasks() {
+    const taskList = document.getElementById('task-list');
+    taskList.innerHTML = '';
+    tasks.forEach(function (task) {
+        let commentsList = '';
+        if (task.comments && task.comments.length > 0) {
+            commentsList = '<ul class="list-group list-group-flush">';
+            task.comments.forEach(comment => {
+                commentsList += `<li class="list-group-item">${comment.description}</li>`;
+            });
+            commentsList += '</ul>';
+        }
+        const taskCard = document.createElement('div');
+        taskCard.className = 'col-md-4 mb-3';
+        taskCard.innerHTML = `
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">${task.title}</h5>
+                <p class="card-text">${task.description}</p>
+                <p class="card-text"><small class="text-muted">Due: ${task.due_date}</small> </p>
+                ${commentsList}
+            </div>
+        </div>
+        `;
+        taskList.appendChild(taskCard);
+    });
+}
+
+document.getElementById('comment-form').addEventListener('submit', async function (e) {
+    e.preventDefault(); // Prevenir el comportamiento por defecto del formulario
+    const comment = document.getElementById('task-comment').value;
+    const selectedTask = parseInt(document.getElementById('comment-task-id').value);
+
+    // Crear el objeto de comentario
+    const commentData = {
+        comment: comment
+    };
+
+    // Enviar el comentario a la API
+    const response = await fetch(`backend/comments.php?task_id=${selectedTask}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(commentData),
+        credentials: 'include' // Incluir cookies para la sesión
+    });
+
+    if (response.ok) {
+        // Comentario guardado exitosamente
+        loadTasks(); // Recargar las tareas para mostrar el nuevo comentario
+    } else {
+        console.error("Error al guardar el comentario");
+    }
+});
