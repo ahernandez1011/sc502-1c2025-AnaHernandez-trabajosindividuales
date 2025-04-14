@@ -84,7 +84,6 @@
      return false;
  }
  
- 
  $method = $_SERVER['REQUEST_METHOD'];
  header('Content-Type: application/json');
  
@@ -94,18 +93,45 @@
  }
  
  session_start();
- 
- if (isset($_SESSION["user_id"])) {
-     try {
- 
- 
-         //continuar con lo demas
-         $userId = $_SESSION["user_id"];
-         switch ($method) {
-             case 'GET':
-                 $tareas = getTasksByUser($userId);
-                 echo json_encode($tareas);
-                 break;
+
+if (isset($_SESSION["user_id"])) {
+    try {
+        $userId = $_SESSION["user_id"];
+        $method = $_SERVER['REQUEST_METHOD'];
+        switch ($method) {
+            case 'GET':
+                $stmt = $conn->prepare("SELECT id, title, description, due_date FROM tasks WHERE user_id = ?");
+                $stmt->bind_param('i', $user_id);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $tasks = [];
+
+                while ($task = $result->fetch_assoc()) {
+                    // Traer comentarios asociados
+                    $commentsStmt = $conn->prepare("
+                        SELECT c.id, c.comment, u.username, c.user_id,
+                               CASE WHEN c.user_id = ? THEN 1 ELSE 0 END AS is_owner
+                        FROM comments c
+                        JOIN users u ON c.user_id = u.id
+                        WHERE c.task_id = ?
+                        ORDER BY c.created_at DESC
+                    ");
+                    $commentsStmt->bind_param('ii', $user_id, $task['id']);
+                    $commentsStmt->execute();
+                    $commentsResult = $commentsStmt->get_result();
+                    $comments = [];
+
+                    while ($comment = $commentsResult->fetch_assoc()) {
+                        $comments[] = $comment;
+                    }
+
+                    $task['comments'] = $comments;
+                    $tasks[] = $task;
+                }
+
+                echo json_encode($tasks);
+                break;
+
              case 'POST':
                  //convertir de JSON a array asociativo para facil manipulacion dentro de php
                  $input = getJsonInput();
@@ -123,6 +149,7 @@
                      echo json_encode(["error" => "Datos insuficientes"]);
                  }
                  break;
+             
              case 'PUT':
                  $input = getJsonInput();
                  if (validateInput($input)) {
@@ -166,3 +193,6 @@
      http_response_code(401);
      echo json_encode(["error" => "Sesion no activa"]);
  }
+
+ 
+

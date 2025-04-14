@@ -62,6 +62,11 @@ switch ($method) {
             exit;
         }
 
+        if (strlen($commentText) > 500) {
+            echo json_encode(['error' => 'El comentario no puede exceder los 500 caracteres']);
+            exit;
+        }
+        
         $stmt = $conn->prepare("INSERT INTO comments (task_id, user_id, comment, created_at) VALUES (?, ?, ?, NOW())");
         $stmt->bind_param('iis', $taskId, $user_id, $commentText);
         if ($stmt->execute()) {
