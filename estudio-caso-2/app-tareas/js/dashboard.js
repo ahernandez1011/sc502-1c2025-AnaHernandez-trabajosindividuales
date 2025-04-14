@@ -134,7 +134,6 @@ document.addEventListener('DOMContentLoaded', function () {
         const selectedTask = parseInt(document.getElementById('comment-task-id').value);
         const task = tasks.find(t => t.id === selectedTask);
  
- 
         let nextCommentId = 1;
  
         if (task.comments) {
@@ -142,7 +141,7 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
             task.comments = [];
         }
- 
+
         task.comments.push({ id: nextCommentId, description: comment });
         const modal = bootstrap.Modal.getInstance(document.getElementById('commentModal'));
         modal.hide();
@@ -347,60 +346,108 @@ document.querySelectorAll('.remove-comment').forEach(function (button) {
         }
     }
     
+    // Función para actualizar un comentario
+async function updateComment(commentId, newCommentText) {
+    try {
+        const response = await fetch(`backend/comments.php?id=${commentId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ comment: newCommentText })
+        });
+        return await response.json();
+    } catch (error) {
+        console.error('Error al actualizar comentario:', error);
+    }
+}
+
     // Renderizar comentarios en el HTML
     async function renderComments(taskId) {
-        const comments = await fetchComments(taskId);
-        const commentsContainer = document.getElementById('comments-container');
-        commentsContainer.innerHTML = '';
-    
-        if (comments.length === 0) {
-            commentsContainer.innerHTML = '<p>No hay comentarios aún.</p>';
-            return;
-        }
-    
-        comments.forEach(comment => {
-            const commentDiv = document.createElement('div');
-            commentDiv.classList.add('comment');
-            commentDiv.innerHTML = `
-                <p><strong>${comment.username}</strong>: ${comment.comment}</p>
-                ${comment.is_owner ? `<button class="delete-comment" data-id="${comment.id}" data-task="${taskId}">Eliminar</button>` : ''}
-            `;
-            commentsContainer.appendChild(commentDiv);
-        });
-    
-        // Agregar evento a los botones de eliminar
-        document.querySelectorAll('.delete-comment').forEach(button => {
-            button.addEventListener('click', async (e) => {
-                const commentId = e.target.getAttribute('data-id');
-                const taskId = e.target.getAttribute('data-task');
-                await deleteComment(commentId);
-                renderComments(taskId);
-            });
-        });
-    }
-    
-    // Manejar la creación de comentario desde el formulario
-    function setupCommentForm(taskId) {
-        const form = document.getElementById('comment-form');
-        const commentInput = document.getElementById('comment-input');
-    
-        form.onsubmit = async function(event) {
-            event.preventDefault();
-            const commentText = commentInput.value.trim();
-            if (!commentText) {
-                alert('El comentario no puede estar vacío.');
+        async function renderComments(taskId) {
+            const comments = await fetchComments(taskId);
+            const commentsContainer = document.getElementById('comments-container');
+            commentsContainer.innerHTML = '';
+        
+            if (comments.length === 0) {
+                commentsContainer.innerHTML = '<p>No hay comentarios aún.</p>';
                 return;
             }
-            await addComment(taskId, commentText);
-            commentInput.value = '';
-            renderComments(taskId);
-        };
-    }
+        
+            comments.forEach(comment => {
+                const commentDiv = document.createElement('div');
+                commentDiv.classList.add('comment');
+        
+                commentDiv.innerHTML = `
+                    <p><strong>${comment.username}</strong>: <span class="comment-text">${comment.comment}</span></p>
+                    ${comment.is_owner ? `
+                        <button class="edit-button" data-id="${comment.id}" data-task="${taskId}">Editar</button>
+                        <button class="delete-comment" data-id="${comment.id}" data-task="${taskId}">Eliminar</button>
+                    ` : ''}
+                `;
+        
+                commentsContainer.appendChild(commentDiv);
+            });        
     
-    // Cuando se seleccione una tarea, carga los comentarios y prepara el formulario
-    function handleTaskSelection(taskId) {
-        renderComments(taskId);
-        setupCommentForm(taskId);
+        // Agregar evento a los botones de eliminar
+            document.querySelectorAll('.delete-comment').forEach(button => {
+                button.addEventListener('click', async (e) => {
+                    const commentId = e.target.getAttribute('data-id');
+                    const taskId = e.target.getAttribute('data-task');
+                    await deleteComment(commentId);
+                    renderComments(taskId);
+                });
+                // Eliminar comentario
+                document.querySelectorAll('.delete-comment').forEach(button => {
+                    button.addEventListener('click', async (e) => {
+                        const commentId = e.target.getAttribute('data-id');
+                        const taskId = e.target.getAttribute('data-task');
+                        await deleteComment(commentId);
+                        renderComments(taskId);
+                    });
+                });
+
+                // Editar comentario
+                document.querySelectorAll('.edit-button').forEach(button => {
+                    button.addEventListener('click', async (e) => {
+                        const commentId = e.target.getAttribute('data-id');
+                        const taskId = e.target.getAttribute('data-task');
+
+                        const commentDiv = e.target.closest('.comment');
+                        const commentTextSpan = commentDiv.querySelector('.comment-text');
+                        const currentText = commentTextSpan.textContent;
+
+                        const newComment = prompt('Edita tu comentario:', currentText);
+                        if (newComment !== null && newComment.trim() !== '') {
+                            await updateComment(commentId, newComment.trim());
+                            renderComments(taskId);
+                        }
+                    });
+                });
+
+
+                // Manejar la creación de comentario desde el formulario
+                function setupCommentForm(taskId) {
+                    const form = document.getElementById('comment-form');
+                    const commentInput = document.getElementById('comment-input');
+
+                    form.onsubmit = async function (event) {
+                        event.preventDefault();
+                        const commentText = commentInput.value.trim();
+                        if (!commentText) {
+                            alert('El comentario no puede estar vacío.');
+                            return;
+                        }
+                        await addComment(taskId, commentText);
+                        commentInput.value = '';
+                        renderComments(taskId);
+                    };
+                }
+
+                // Cuando se seleccione una tarea, carga los comentarios y prepara el formulario
+                function handleTaskSelection(taskId) {
+                    renderComments(taskId);
+                    setupCommentForm(taskId);
+                }
+            }
+        )}
     }
-    
-});
+ });

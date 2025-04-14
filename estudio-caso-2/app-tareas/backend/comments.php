@@ -1,5 +1,4 @@
 <?php
-// comments.php
 
 header('Content-Type: application/json');
 session_start();
@@ -98,6 +97,42 @@ switch ($method) {
             echo json_encode(['success' => true]);
         } else {
             echo json_encode(['error' => 'Error al eliminar comentario']);
+        }
+        break;
+    case 'PUT':
+        if (!$commentId) {
+            echo json_encode(['error' => 'Falta el ID del comentario']);
+            exit;
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true);
+        $newCommentText = trim($data['comment'] ?? '');
+
+        if (empty($newCommentText)) {
+            echo json_encode(['error' => 'El comentario no puede estar vacío']);
+            exit;
+        }
+
+        // Verificar que el comentario pertenezca al usuario antes de actualizar
+        $stmt = $conn->prepare("SELECT user_id FROM comments WHERE id = ?");
+        $stmt->bind_param('i', $commentId);
+        $stmt->execute();
+        $stmt->bind_result($commentUserId);
+        $stmt->fetch();
+        $stmt->close();
+
+        if ($commentUserId !== $user_id) {
+            http_response_code(403);
+            echo json_encode(['error' => 'No tienes permisos para editar este comentario']);
+            exit;
+        }
+
+        $stmt = $conn->prepare("UPDATE comments SET comment = ? WHERE id = ?");
+        $stmt->bind_param('si', $newCommentText, $commentId);
+        if ($stmt->execute()) {
+            echo json_encode(['success' => true]);
+        } else {
+            echo json_encode(['error' => 'Error al actualizar comentario']);
         }
         break;
 
