@@ -309,4 +309,98 @@ document.querySelectorAll('.remove-comment').forEach(function (button) {
             console.error("Error al eliminar el comentario");
         }
     });
+
+    async function fetchComments(taskId) {
+        try {
+            const response = await fetch(`backend/comments.php?task_id=${taskId}`);
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error('Error al obtener comentarios:', error);
+            return [];
+        }
+    }
+    
+    // Función para agregar un comentario
+    async function addComment(taskId, commentText) {
+        try {
+            const response = await fetch(`backend/comments.php?task_id=${taskId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ comment: commentText })
+            });
+            return await response.json();
+        } catch (error) {
+            console.error('Error al agregar comentario:', error);
+        }
+    }
+    
+    // Función para eliminar un comentario
+    async function deleteComment(commentId) {
+        try {
+            const response = await fetch(`backend/comments.php?id=${commentId}`, {
+                method: 'DELETE'
+            });
+            return await response.json();
+        } catch (error) {
+            console.error('Error al eliminar comentario:', error);
+        }
+    }
+    
+    // Renderizar comentarios en el HTML
+    async function renderComments(taskId) {
+        const comments = await fetchComments(taskId);
+        const commentsContainer = document.getElementById('comments-container');
+        commentsContainer.innerHTML = '';
+    
+        if (comments.length === 0) {
+            commentsContainer.innerHTML = '<p>No hay comentarios aún.</p>';
+            return;
+        }
+    
+        comments.forEach(comment => {
+            const commentDiv = document.createElement('div');
+            commentDiv.classList.add('comment');
+            commentDiv.innerHTML = `
+                <p><strong>${comment.username}</strong>: ${comment.comment}</p>
+                ${comment.is_owner ? `<button class="delete-comment" data-id="${comment.id}" data-task="${taskId}">Eliminar</button>` : ''}
+            `;
+            commentsContainer.appendChild(commentDiv);
+        });
+    
+        // Agregar evento a los botones de eliminar
+        document.querySelectorAll('.delete-comment').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const commentId = e.target.getAttribute('data-id');
+                const taskId = e.target.getAttribute('data-task');
+                await deleteComment(commentId);
+                renderComments(taskId);
+            });
+        });
+    }
+    
+    // Manejar la creación de comentario desde el formulario
+    function setupCommentForm(taskId) {
+        const form = document.getElementById('comment-form');
+        const commentInput = document.getElementById('comment-input');
+    
+        form.onsubmit = async function(event) {
+            event.preventDefault();
+            const commentText = commentInput.value.trim();
+            if (!commentText) {
+                alert('El comentario no puede estar vacío.');
+                return;
+            }
+            await addComment(taskId, commentText);
+            commentInput.value = '';
+            renderComments(taskId);
+        };
+    }
+    
+    // Cuando se seleccione una tarea, carga los comentarios y prepara el formulario
+    function handleTaskSelection(taskId) {
+        renderComments(taskId);
+        setupCommentForm(taskId);
+    }
+    
 });

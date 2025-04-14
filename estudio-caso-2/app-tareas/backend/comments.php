@@ -1,130 +1,108 @@
 <?php
-require('db.php');
+// comments.php
 
-function createComment($taskId, $comment) {
-    global $pdo;
-    try {
-        $sql = "INSERT INTO comments (task_id, comment) VALUES (:task_id, :comment)";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute(['task_id' => $taskId, 'comment' => $comment]);
-        return $pdo->lastInsertId();
-    } catch (Exception $e) {
-        echo $e->getMessage();
-        return 0;
-    }
-}
-
-function getCommentsByTask($taskId) {
-    global $pdo;
-    try {
-        $stmt = $pdo->prepare("SELECT * FROM comments WHERE task_id = :task_id");
-        $stmt->execute(['task_id' => $taskId]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Exception $e) {
-        echo "Error al obtener los comentarios: " . $e->getMessage();
-        return [];
-    }
-}
-
-function editComment($id, $comment) {
-    global $pdo;
-    try {
-        $sql = "UPDATE comments SET comment = :comment WHERE id = :id";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute(['comment' => $comment, 'id' => $id]);
-        return $stmt->rowCount() > 0;
-    } catch (Exception $e) {
-        echo $e->getMessage();
-        return false;
-    }
-}
-
-function deleteComment($id) {
-    global $pdo;
-    try {
-        $sql = "DELETE FROM comments WHERE id = :id";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute(['id' => $id]);
-        return $stmt->rowCount() > 0;
-    } catch (Exception $e) {
-        echo $e->getMessage();
-        return false;
-    }
-}
-
-$method = $_SERVER['REQUEST_METHOD'];
 header('Content-Type: application/json');
-
 session_start();
 
-if (isset($_SESSION["user_id"])) {
-    $taskId = $_GET['task_id'] ?? null;
+require 'db.php'; // Asegúrate de tener tu conexión a base de datos
 
-    switch ($method) {
-        case 'GET':
-            if ($taskId) {
-                $comments = getCommentsByTask($taskId);
-                echo json_encode($comments);
-            } else {
-                http_response_code(400);
-                echo json_encode(["error" => "task_id es requerido"]);
-            }
-            break;
-
-        case 'POST':
-            $input = json_decode(file_get_contents("php://input"), true);
-            if (isset($input['comment']) && $taskId) {
-                $commentId = createComment($taskId, $input['comment']);
-                if ($commentId > 0) {
-                    http_response_code(201);
-                    echo json_encode(["message" => "Comentario creado exitosamente", "id" => $commentId]);
-                } else {
-                    http_response_code(500);
-                    echo json_encode(['error' => "Error al crear el comentario"]);
-                }
-            } else {
-                http_response_code(400);
-                echo json_encode(["error" => "comment es requerido"]);
-            }
-            break;
-
-        case 'PUT':
-            $input = json_decode(file_get_contents("php://input"), true);
-            if (isset($input['comment']) && isset($_GET['id'])) {
-                if (editComment($_GET['id'], $input['comment'])) {
-                    http_response_code(200);
-                    echo json_encode(['message' => "Comentario actualizado exitosamente"]);
-                } else {
-                    http_response_code(500);
-                    echo json_encode(['error' => "Error al actualizar el comentario"]);
-                }
-            } else {
-                http_response_code(400);
-                echo json_encode(['error' => 'Datos insuficientes']);
-            }
-            break;
-
-        case 'DELETE':
-            if (isset($_GET['id'])) {
-                if (deleteComment($_GET['id'])) {
-                    http_response_code(200);
-                    echo json_encode(['message' => "Comentario eliminado exitosamente"]);
-                } else {
-                    http_response_code(500);
-                    echo json_encode(['error' => "Error al eliminar el comentario"]);
-                }
-            } else {
-                http_response_code(400);
-                echo json_encode(['error' => "id es requerido"]);
-            }
-            break;
-
-        default:
-            http_response_code(405);
-            echo json_encode(["error" => "Método no permitido"]);
-    }
-} else {
+// Verificar si el usuario está logueado
+if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
-    echo json_encode(["error" => "Sesión no activa"]);
+    echo json_encode(['error' => 'No autorizado']);
+    exit;
 }
-?>
+
+$user_id = $_SESSION['user_id'];
+
+// Obtener método de solicitud
+$method = $_SERVER['REQUEST_METHOD'];
+
+// Obtener parámetros
+$taskId = isset($_GET['task_id']) ? intval($_GET['task_id']) : null;
+$commentId = isset($_GET['id']) ? intval($_GET['id']) : null;
+
+switch ($method) {
+    case 'GET':
+        if (!$taskId) {
+            echo json_encode(['error' => 'Falta el ID de la tarea']);
+            exit;
+        }
+
+        $stmt = $conn->prepare("
+            SELECT c.id, c.comment, c.user_id, u.username,
+                   CASE WHEN c.user_id = ? THEN 1 ELSE 0 END AS is_owner
+            FROM comments c
+            JOIN users u ON c.user_id = u.id
+            WHERE c.task_id = ?
+            ORDER BY c.created_at DESC
+        ");
+        $stmt->bind_param('ii', $user_id, $taskId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $comments = [];
+
+        while ($row = $result->fetch_assoc()) {
+            $comments[] = $row;
+        }
+
+        echo json_encode($comments);
+        break;
+
+    case 'POST':
+        if (!$taskId) {
+            echo json_encode(['error' => 'Falta el ID de la tarea']);
+            exit;
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true);
+        $commentText = trim($data['comment'] ?? '');
+
+        if (empty($commentText)) {
+            echo json_encode(['error' => 'El comentario no puede estar vacío']);
+            exit;
+        }
+
+        $stmt = $conn->prepare("INSERT INTO comments (task_id, user_id, comment, created_at) VALUES (?, ?, ?, NOW())");
+        $stmt->bind_param('iis', $taskId, $user_id, $commentText);
+        if ($stmt->execute()) {
+            echo json_encode(['success' => true]);
+        } else {
+            echo json_encode(['error' => 'Error al insertar comentario']);
+        }
+        break;
+
+    case 'DELETE':
+        if (!$commentId) {
+            echo json_encode(['error' => 'Falta el ID del comentario']);
+            exit;
+        }
+
+        // Verificar que el comentario pertenezca al usuario antes de eliminar
+        $stmt = $conn->prepare("SELECT user_id FROM comments WHERE id = ?");
+        $stmt->bind_param('i', $commentId);
+        $stmt->execute();
+        $stmt->bind_result($commentUserId);
+        $stmt->fetch();
+        $stmt->close();
+
+        if ($commentUserId !== $user_id) {
+            http_response_code(403);
+            echo json_encode(['error' => 'No tienes permisos para eliminar este comentario']);
+            exit;
+        }
+
+        $stmt = $conn->prepare("DELETE FROM comments WHERE id = ?");
+        $stmt->bind_param('i', $commentId);
+        if ($stmt->execute()) {
+            echo json_encode(['success' => true]);
+        } else {
+            echo json_encode(['error' => 'Error al eliminar comentario']);
+        }
+        break;
+
+    default:
+        http_response_code(405);
+        echo json_encode(['error' => 'Método no permitido']);
+        break;
+}
