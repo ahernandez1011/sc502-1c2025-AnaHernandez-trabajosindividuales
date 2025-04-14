@@ -21,18 +21,24 @@
      }
  }
  
- function getTasksByUser($userId)
- {
-     try {
-         global $pdo;
-         $stmt = $pdo->prepare("SELECT * FROM tasks where user_id = :user_id");
-         $stmt->execute(['user_id' => $userId]);
-         return $stmt->fetchAll(PDO::FETCH_ASSOC);
-     } catch (Exception $ex) {
-         echo "Error al obtener las tareas del usuario" . $ex->getMessage();
-         return [];
-     }
- }
+ function getTasksByUser ($userId) {
+    try {
+        global $pdo;
+        $stmt = $pdo->prepare("SELECT * FROM tasks WHERE user_id = :user_id");
+        $stmt->execute(['user_id' => $userId]);
+        $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Obtener comentarios para cada tarea
+        foreach ($tasks as &$task) {
+            $task['comments'] = getCommentsByTask($task['id']);
+        }
+
+        return $tasks;
+    } catch (Exception $ex) {
+        echo "Error al obtener las tareas del usuario: " . $ex->getMessage();
+        return [];
+    }
+}
  
  function editTask($id, $title, $description, $dueDate)
  {

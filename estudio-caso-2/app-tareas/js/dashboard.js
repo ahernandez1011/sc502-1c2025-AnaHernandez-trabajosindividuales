@@ -26,40 +26,38 @@ document.addEventListener('DOMContentLoaded', function () {
     }
  
     function renderTasks() {
-        const taskList = document.getElementById('task-list');
-        taskList.innerHTML = '';
-        tasks.forEach(function (task) {
- 
-            let commentsList = '';
-            if (task.comments && task.comments.length > 0) {
-                commentsList = '<ul class="list-group list-group-flush">';
-                task.comments.forEach(comment => {
-                    commentsList += `<li class="list-group-item">${comment.description}
-                    <button type="button" class="btn btn-sm btn-link remove-comment" data-visitid="${task.id}" data-commentid="${comment.id}">Remove</button>
-                    </li>`;
-                });
-                commentsList += '</ul>';
-            }
-            const taskCard = document.createElement('div');
-            taskCard.className = 'col-md-4 mb-3';
-            taskCard.innerHTML = `
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">${task.title}</h5>
-                    <p class="card-text">${task.description}</p>
-                    <p class="card-text"><small class="text-muted">Due: ${task.due_date}</small> </p>
-                    ${commentsList}
-                     <button type="button" class="btn btn-sm btn-link add-comment"  data-id="${task.id}">Add Comment</button>
- 
-                </div>
-                <div class="card-footer d-flex justify-content-between">
-                    <button class="btn btn-secondary btn-sm edit-task"data-id="${task.id}">Edit</button>
-                    <button class="btn btn-danger btn-sm delete-task" data-id="${task.id}">Delete</button>
-                </div>
+    const taskList = document.getElementById('task-list');
+    taskList.innerHTML = '';
+    tasks.forEach(function (task) {
+        let commentsList = '';
+        if (task.comments && task.comments.length > 0) {
+            commentsList = '<ul class="list-group list-group-flush">';
+            task.comments.forEach(comment => {
+                commentsList += `<li class="list-group-item">${comment.comment}
+                <button type="button" class="btn btn-sm btn-link remove-comment" data-id="${comment.id}">Remove</button>
+                </li>`;
+            });
+            commentsList += '</ul>';
+        }
+        const taskCard = document.createElement('div');
+        taskCard.className = 'col-md-4 mb-3';
+        taskCard.innerHTML = `
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">${task.title}</h5>
+                <p class="card-text">${task.description}</p>
+                <p class="card-text"><small class="text-muted">Due: ${task.due_date}</small> </p>
+                ${commentsList}
+                <button type="button" class="btn btn-sm btn-link add-comment" data-id="${task.id}">Add Comment</button>
             </div>
-            `;
-            taskList.appendChild(taskCard);
-        });
+            <div class="card-footer d-flex justify-content-between">
+                <button class="btn btn-secondary btn-sm edit-task" data-id="${task.id}">Edit</button>
+                <button class="btn btn-danger btn-sm delete-task" data-id="${task.id}">Delete</button>
+            </div>
+        </div>
+        `;
+        taskList.appendChild(taskCard);
+    });
  
         document.querySelectorAll('.edit-task').forEach(function (button) {
             button.addEventListener('click', handleEditTask);
@@ -151,6 +149,31 @@ document.addEventListener('DOMContentLoaded', function () {
         loadTasks();
  
     })
+
+    document.getElementById('comment-form').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const comment = document.getElementById('task-comment').value;
+        const selectedTask = parseInt(document.getElementById('comment-task-id').value);
+    
+        const commentData = {
+            comment: comment
+        };
+    
+        const response = await fetch(`backend/comments.php?task_id=${selectedTask}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(commentData),
+            credentials: 'include'
+        });
+    
+        if (response.ok) {
+            loadTasks(); // Recargar las tareas para mostrar el nuevo comentario
+        } else {
+            console.error("Error al guardar el comentario");
+        }
+    });
  
     document.getElementById('task-form').addEventListener('submit', async function (e) {
         e.preventDefault();
@@ -270,4 +293,20 @@ document.getElementById('comment-form').addEventListener('submit', async functio
     } else {
         console.error("Error al guardar el comentario");
     }
+});
+
+document.querySelectorAll('.remove-comment').forEach(function (button) {
+    button.addEventListener('click', async function (e) {
+        const commentId = parseInt(e.target.dataset.id);
+        const response = await fetch(`backend/comments.php?id=${commentId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        if (response.ok) {
+            loadTasks(); // Recargar las tareas para reflejar la eliminación
+        } else {
+            console.error("Error al eliminar el comentario");
+        }
+    });
 });
